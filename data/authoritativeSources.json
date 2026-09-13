@@ -1,0 +1,34 @@
+[
+  {
+    "id": "tkdl",
+    "title": "Traditional Knowledge Digital Library (TKDL)",
+    "portal": "tkdl.res.in",
+    "url": "https://www.tkdl.res.in",
+    "statute": "CSIR-AYUSH Repository of Codified Ayurveda",
+    "coverage": "Prior-art search against 250,000+ classical formulations to prevent biopiracy."
+  },
+  {
+    "id": "patents_act",
+    "title": "Indian Patents Act, 1970 (Amended 2024)",
+    "portal": "indiacode.nic.in",
+    "url": "https://www.indiacode.nic.in",
+    "statute": "Section 3(p), Section 3(e), Rule 24C",
+    "coverage": "Statutory non-patentability bars for traditional knowledge and mere admixtures."
+  },
+  {
+    "id": "ip_india",
+    "title": "Controller General of Patents, Designs & Trade Marks",
+    "portal": "ipindia.gov.in",
+    "url": "https://ipindia.gov.in",
+    "statute": "Guidelines for Examination of Traditional Knowledge Inventions",
+    "coverage": "Official InPASS patent filing, FER response standards, and Form 1 / 2 filing."
+  },
+  {
+    "id": "nba",
+    "title": "National Biodiversity Authority (NBA)",
+    "portal": "nbaindia.org",
+    "url": "https://nbaindia.org",
+    "statute": "Biological Diversity Rules, 2024 (Section 3, 7, 24)",
+    "coverage": "Mandatory Form I SBB intimation and Form III patent clearance approval."
+  }
+]
