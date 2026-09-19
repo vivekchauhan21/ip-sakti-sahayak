@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/useLanguage";
 
 interface DossierDataProps {
   formulation: string;
@@ -13,6 +14,7 @@ interface DossierDataProps {
 }
 
 export default function DossierExportButton({ data }: { data: DossierDataProps }) {
+  const { t } = useLanguage();
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportDossier = () => {
@@ -70,7 +72,11 @@ It constitutes preliminary statutory guidance under Patents Act 1970 and BDA 202
       className="w-full mt-4 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
     >
       <span>📄</span>
-      <span>{isExporting ? "Compiling Dossier..." : "Download Full Audit Dossier (.txt / Report)"}</span>
+      <span>
+        {isExporting
+          ? (t.compiling_dossier_btn || "Compiling Dossier...")
+          : (t.download_dossier_btn || t.download_dossier || "Download Full Audit Dossier (.txt / Report)")}
+      </span>
     </button>
   );
 }

@@ -1,788 +1,907 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  saveActiveFormulation,
-  getActiveFormulation,
-} from "@/lib/formulationStore";
-import { useLanguage } from "@/lib/useLanguage";
-import {
-  ArrowUpRight,
-  BadgeCheck,
-  BookOpenCheck,
-  Check,
-  Globe,
-  Globe2,
-  Landmark,
-  Leaf,
   Scale,
   ShieldCheck,
+  BookOpenCheck,
+  FileText,
+  Download,
+  LogIn,
+  User,
+  Mail,
+  ExternalLink,
+  CheckCircle2,
   Sparkles,
-  Waves,
+  ArrowRight,
+  ArrowDown,
+  Layers,
+  Lock,
+  AlertCircle,
+  X,
+  ChevronRight,
+  Gavel,
+  ShieldAlert,
+  GraduationCap,
+  Globe2,
+  LogOut,
 } from "lucide-react";
-import VoiceInputButton from "@/components/VoiceInputButton";
-import DossierExportButton from "@/components/DossierExportButton";
 
-const PdfViewerModal = dynamic(() => import("@/components/PdfViewerModal"), {
-  ssr: false,
-});
+interface LanguageOption {
+  code: string;
+  name: string;
+  nativeName: string;
+  fileName: string;
+  fileSize: string;
+  badge: string;
+}
 
-// criteriaList and DEMO_PRESETS are now defined inside the component to support translations
+const LANGUAGE_OPTIONS: LanguageOption[] = [
+  {
+    code: "en",
+    name: "English",
+    nativeName: "English",
+    fileName: "ip-sakti-guide-en.pdf",
+    fileSize: "13 KB",
+    badge: "Official Gazettes",
+  },
+  {
+    code: "hi",
+    name: "Hindi",
+    nativeName: "हिन्दी",
+    fileName: "ip-sakti-guide-hi.pdf",
+    fileSize: "14 KB",
+    badge: "मानक राजपत्र",
+  },
+  {
+    code: "ta",
+    name: "Tamil",
+    nativeName: "தமிழ்",
+    fileName: "ip-sakti-guide-ta.pdf",
+    fileSize: "13 KB",
+    badge: "சட்ட வழிகாட்டி",
+  },
+  {
+    code: "te",
+    name: "Telugu",
+    nativeName: "తెలుగు",
+    fileName: "ip-sakti-guide-te.pdf",
+    fileSize: "13 KB",
+    badge: "చట్టపరమైన మార్గదర్శి",
+  },
+  {
+    code: "bn",
+    name: "Bengali",
+    nativeName: "বাংলা",
+    fileName: "ip-sakti-guide-bn.pdf",
+    fileSize: "13 KB",
+    badge: "আইনি নির্দেশিকা",
+  },
+];
 
-export default function Home() {
-  const { t, lang, changeLanguage, supportedLanguages } = useLanguage();
-  const [jurisdiction, setJurisdiction] = useState<"india" | "international">("india");
+const STATUTORY_SECTIONS = [
+  {
+    tag: "Section 3(p)",
+    act: "Indian Patents Act, 1970",
+    title: "Traditional Knowledge & Aggregation Exclusion",
+    description:
+      "Statutory bar against claiming traditional knowledge or inventions that are mere aggregations / duplications of known properties of traditionally documented plants. Applicants bear the burden of proving significant technological advancement and non-obvious synergy beyond ancient Ayurvedic literature.",
+    highlight: "Non-patentable if documented in TKDL without demonstrated technical synergy.",
+    icon: Scale,
+    badgeColor: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+  },
+  {
+    tag: "Section 3(e)",
+    act: "Indian Patents Act, 1970",
+    title: "Mere Admixture & Statutory Synergy Burden",
+    description:
+      "Excludes substances resulting from mere physical admixtures yielding only additive properties. To clear Section 3(e), applicants must submit empirical bio-enhancement indices, Combination Index (CI < 1.0), or pharmacological synergism demonstrating 1+1 > 2.",
+    highlight: "Requires quantitative synergy data beyond routine herbal blending.",
+    icon: Sparkles,
+    badgeColor: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
+  },
+  {
+    tag: "BDA 2002 / 2024",
+    act: "Biological Diversity Act (Amended)",
+    title: "ABS Approvals & SBB Prior Intimation",
+    description:
+      "Sections 3, 7, 19, and 24 mandate prior National Biodiversity Authority (NBA) approval before applying for IPRs on Indian bio-resources, alongside State Biodiversity Board (SBB) intimation and fair Access & Benefit Sharing (ABS) royalty agreements.",
+    highlight: "Mandatory statutory compliance before patent grant to avoid penal action.",
+    icon: ShieldCheck,
+    badgeColor: "text-teal-400 bg-teal-500/10 border-teal-500/30",
+  },
+  {
+    tag: "GSR 918(E)",
+    act: "Drugs & Cosmetics Rules, 1945",
+    title: "Phytopharmaceutical Regulatory Track",
+    description:
+      "Standardized regulatory gateway for purified, characterized fractions of medicinal plants. Enforces strict chromatographic fingerprinting (HPTLC/HPLC), batch-to-batch chemical stability, toxicology assays, and phase clinical safety under CDSCO and AYUSH.",
+    highlight: "Bridges classical Ayurvedic herbal medicine with modern allopathic rigor.",
+    icon: BookOpenCheck,
+    badgeColor: "text-cyan-400 bg-cyan-500/10 border-cyan-500/30",
+  },
+];
 
-  // Criteria list — rebuilt when language changes
-  const criteriaList = [
-    { id: "classical_ref", title: t.criteria_classical_ref_title || "Classical Texts Reference", desc: t.criteria_classical_ref_desc || "Referenced in 1st Schedule authoritative Ayurvedic texts" },
-    { id: "classical_method", title: t.criteria_classical_method_title || "Textual Method", desc: t.criteria_classical_method_desc || "Preparation method follows documented tradition" },
-    { id: "modern_excipients", title: t.criteria_modern_excipients_title || "Modern Excipients", desc: t.criteria_modern_excipients_desc || "Contains contemporary non-classical ingredients" },
-    { id: "purified_fraction", title: t.criteria_purified_fraction_title || "Purified Botanical Fraction", desc: t.criteria_purified_fraction_desc || "Standardized purified active extract fraction isolated" },
-    { id: "ayurveda_aahar", title: t.criteria_ayurveda_aahar_title || "Ayurveda Aahar", desc: t.criteria_ayurveda_aahar_desc || "Intended as functional food or nutraceutical" },
-    { id: "cosmetic_use", title: t.criteria_cosmetic_use_title || "Topical Cosmetic", desc: t.criteria_cosmetic_use_desc || "Applied externally for topical skin/hair benefit" },
-    { id: "synergistic_efficacy", title: t.criteria_synergistic_efficacy_title || "Synergistic Efficacy data", desc: t.criteria_synergistic_efficacy_desc || "Evidence shows more than additive pharmacological action" },
-  ];
+const PLATFORM_FEATURES = [
+  {
+    title: "Dynamic Statutory Evaluator",
+    subtitle: "Section 3(p) & 3(e) Engine",
+    description:
+      "Classify multi-ingredient formulations, analyze botanical ratios against Ayurvedic Pharmacopoeia (API), and receive instant patentability verdicts.",
+    href: "/evaluator",
+    tag: "Core Workspace",
+    icon: Scale,
+  },
+  {
+    title: "Novelty Meter & Prior Art",
+    subtitle: "TKDL & Literature Benchmarking",
+    description:
+      "Cross-check active phytocompounds against Classical Ayurvedic Samhitas (Charaka, Sushruta) and contemporary scientific publication databases.",
+    href: "/novelty",
+    tag: "Prior Art Scanner",
+    icon: Sparkles,
+  },
+  {
+    title: "Cross-Border Export Matrix",
+    subtitle: "India vs US FDA vs EMA",
+    description:
+      "Harmonize compliance across CDSCO AYUSH, US FDA Dietary Supplement (DSHEA) / Botanical Drug guidance, and EU Traditional Herbal Medicinal Products Directive (THMPD).",
+    href: "/export-matrix",
+    tag: "Global Harmonization",
+    icon: Globe2,
+  },
+  {
+    title: "BDA Compliance Checker",
+    subtitle: "ABS & SBB Statutory Gateway",
+    description:
+      "Determine Form 1/Form 3 NBA filing requirements, calculate Access & Benefit Sharing percentages, and safeguard against Section 55 biological piracy penalties.",
+    href: "/biodiversity",
+    tag: "Biodiversity Act",
+    icon: ShieldAlert,
+  },
+  {
+    title: "Virtual Hearing Mock Trial",
+    subtitle: "Controller Objection Simulation",
+    description:
+      "AI-driven simulated IPO controller cross-examination. Practice responding to FER objections under Sections 3(p), 3(e), and 2(1)(j) in real time.",
+    href: "/mock-hearing",
+    tag: "Examination Prep",
+    icon: Gavel,
+  },
+  {
+    title: "Anti-Biopiracy Shield",
+    subtitle: "Defensive Publication & TK Defense",
+    description:
+      "Generate defensive publication disclosures to place traditional knowledge in the public domain and challenge predatory foreign patents.",
+    href: "/defensive-shield",
+    tag: "Heritage Defense",
+    icon: ShieldCheck,
+  },
+];
 
-  // Demo presets — rebuilt when language changes
-  const DEMO_PRESETS = [
-    {
-      name: t.preset_phyto_name || "Phytopharmaceutical Track",
-      badge: t.preset_phyto_badge || "Patentable",
-      badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      data: {
-        search_query: "Standardized Withaferin-A fraction with Piperine",
-        classical_ref: true,
-        classical_method: false,
-        modern_excipients: true,
-        purified_fraction: true,
-        ayurveda_aahar: false,
-        cosmetic_use: false,
-        synergistic_efficacy: true,
-      },
-    },
-    {
-      name: t.preset_classical_name || "Classical Churna Formulation",
-      badge: t.preset_classical_badge || "Section 3(p) Barred",
-      badgeColor: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-      data: {
-        search_query: "Classical Triphala Churna formulation",
-        classical_ref: true,
-        classical_method: true,
-        modern_excipients: false,
-        purified_fraction: false,
-        ayurveda_aahar: false,
-        cosmetic_use: false,
-        synergistic_efficacy: false,
-      },
-    },
-    {
-      name: t.preset_aahar_name || "Ayurveda Aahar Functional Food",
-      badge: t.preset_aahar_badge || "FSSAI / AYUSH Track",
-      badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-      data: {
-        search_query: "Amla and Turmeric botanical wellness infusion",
-        classical_ref: true,
-        classical_method: false,
-        modern_excipients: false,
-        purified_fraction: false,
-        ayurveda_aahar: true,
-        cosmetic_use: false,
-        synergistic_efficacy: false,
-      },
-    },
-  ];
+const GOV_AUTHORITIES = [
+  {
+    name: "CSIR - TKDL",
+    fullname: "Traditional Knowledge Digital Library",
+    description: "Pioneering Indian database guarding 4.5+ lakh classical formulations against wrongful patents worldwide.",
+    url: "https://www.tkdl.res.in",
+    badge: "Prior Art Repository",
+  },
+  {
+    name: "India Code",
+    fullname: "Legislative Department, Ministry of Law",
+    description: "Official digital repository for Indian Patents Act 1970, Sections 3(p), 3(e), and Rules 2003.",
+    url: "https://www.indiacode.nic.in",
+    badge: "Statutory Law",
+  },
+  {
+    name: "IP India (CGPDTM)",
+    fullname: "Controller General of Patents, Designs & Trademarks",
+    description: "National patent office governing patent prosecution, First Examination Reports (FER), and patent grants.",
+    url: "https://ipindia.gov.in",
+    badge: "Patent Office",
+  },
+  {
+    name: "NBA India",
+    fullname: "National Biodiversity Authority",
+    description: "Statutory autonomous body implementing Biological Diversity Act, regulating bio-resource commercialization.",
+    url: "http://nbaindia.org",
+    badge: "Biodiversity & ABS",
+  },
+];
 
-  const [formData, setFormData] = useState<Record<string, any>>({
-    search_query: "Standardized Withaferin-A fraction with Piperine",
-    classical_ref: true,
-    classical_method: false,
-    modern_excipients: true,
-    purified_fraction: true,
-    ayurveda_aahar: false,
-    cosmetic_use: false,
-    synergistic_efficacy: true,
-  });
+export default function WelcomeLandingPage() {
+  const router = useRouter();
 
-  // Deterministic evaluation engine with Dual-Jurisdiction Layer
-  const evaluateLocally = (data: Record<string, any>, jur: "india" | "international") => {
-    if (jur === "international") {
-      if (data.purified_fraction && data.synergistic_efficacy) {
-        return {
-          category: "Botanical Drug Substance (FDA 505(b)(2) / EMA Track)",
-          regulatory_reference: "US FDA Botanical Guidance / EMA HMPC",
-          match_confidence: 91,
-          patentability_verdict: "PCT Patent Eligible (Art. 33)",
-          verdict_badge: "PCT ROUTE ELIGIBLE",
-          verdict_color: "emerald",
-          verdict_description: "Eligible for WIPO PCT International Phase under IPC Class A61K. Complies with WIPO Treaty on Genetic Resources (GRATK 2024) mandatory disclosure rules.",
-          steps: [
-            { title: "WIPO PCT International Filing (RO/IN)", desc: "File Form PCT/RO/101 designating US, EPO & ASEAN territories", status: "MANDATORY", color: "rose" },
-            { title: "WIPO GRATK Mandatory Origin Disclosure", desc: "Mandatory declaration of Indian genetic resource sourcing", status: "STATUTORY", color: "rose" },
-            { title: "Nagoya Protocol ABS Compliance (CBD)", desc: "Obtain Internationally Recognized Certificate of Compliance (IRCC)", status: "REQUIRED", color: "rose" },
-            { title: "US FDA IND Botanical Dossier", desc: "Chemistry, Manufacturing, and Controls (CMC) batch fingerprinting", status: "ADVISED", color: "amber" },
-          ],
-        };
-      }
+  // Modals state
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-      return {
-        category: "Traditional Herbal Medicinal Product (THMPD)",
-        regulatory_reference: "EU Directive 2004/24/EC / WHO Traditional Guidelines",
-        match_confidence: 86,
-        patentability_verdict: "Barred Abroad (EPC Art. 54 Novelty Defect)",
-        verdict_badge: "PRIOR-ART BARRED",
-        verdict_color: "rose",
-        verdict_description: "TKDL bilateral access agreements with USPTO and EPO will trigger automatic novelty objections. Prioritize Defensive Vault publication.",
-        steps: [
-          { title: "EU Simplified Registration Dossier", desc: "Demonstrate 30 years medicinal use (including 15 years in EU)", status: "MANDATORY", color: "rose" },
-          { title: "WIPO Defensive Vault Anchor", desc: "Publish cryptographic prior art to prevent foreign corporate piracy", status: "URGENT", color: "rose" },
-          { title: "International ABS Benefit Sharing", desc: "Clear bilateral access permissions under Nagoya clearing-house", status: "REQUIRED", color: "amber" },
-          { title: "CITES Flora Export Verification", desc: "Obtain clearance if species is listed under CITES Appendix II", status: "CHECK", color: "blue" },
-        ],
-      };
-    }
+  // User session state
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string } | null>(null);
 
-    // National (India) Jurisdiction Logic
-    if (data.purified_fraction && data.synergistic_efficacy) {
-      return {
-        category: "Phytopharmaceutical Drug",
-        regulatory_reference: "CDSCO Gazette GSR 918(E)",
-        match_confidence: 94,
-        patentability_verdict: "High Patentability Potential",
-        verdict_badge: "PROVISIONALLY ELIGIBLE",
-        verdict_color: "emerald",
-        verdict_description: "Standardized active fraction with proven synergy overcomes Section 3(p) TKDL and 3(e) admixture barriers.",
-        steps: [
-          { title: "CDSCO Central Licensing (Form 44)", desc: "Submit IND package and chemistry manufacturing controls", status: "REQUIRED", color: "rose" },
-          { title: "Phase I to IV Clinical Trials", desc: "Adhere to New Drugs and Clinical Trials Rules 2019", status: "REQUIRED", color: "rose" },
-          { title: "Quality Dossier Fingerprinting", desc: "Mandatory HPLC/HPTLC/LC-MS batch uniformity evidence", status: "REQUIRED", color: "rose" },
-          { title: "State Biodiversity Board (SBB) Intimation", desc: "File Form I prior intimation under BDA 2024", status: "ADVISED", color: "amber" },
-        ],
-      };
-    }
+  // Login form state
+  const [loginName, setLoginName] = useState("Vivek");
+  const [loginEmail, setLoginEmail] = useState("demo@gmail.com");
+  const [loginError, setLoginError] = useState("");
 
-    if (data.ayurveda_aahar) {
-      return {
-        category: "Ayurveda Aahar (Functional Food)",
-        regulatory_reference: "FSSAI-AYUSH Reg. 2022",
-        match_confidence: 88,
-        patentability_verdict: "Patent Barred (FSSAI Route)",
-        verdict_badge: "REGULATORY COMPLIANT",
-        verdict_color: "blue",
-        verdict_description: "Designated as nutritional food supplement. Clear from Section 3(p) as culinary formulation, but non-patentable as medicine.",
-        steps: [
-          { title: "FSSAI Special AYUSH Licensing", desc: "Mandatory Form B registration under Ayurveda Aahar regulations", status: "REQUIRED", color: "rose" },
-          { title: "Heavy Metal & Microbial Testing", desc: "Compliant with Food Safety and Standards permissible limits", status: "REQUIRED", color: "rose" },
-          { title: "Labeling & Non-Medical Claims", desc: "Strictly prohibit therapeutic disease claims on packaging", status: "REQUIRED", color: "rose" },
-          { title: "SBB Domestic Exemption Verification", desc: "Exempt from commercial ABS levy for declared dietary food", status: "EXEMPT", color: "emerald" },
-        ],
-      };
-    }
+  // Download feedback
+  const [downloadingCode, setDownloadingCode] = useState<string | null>(null);
+  const [downloadSuccessMessage, setDownloadSuccessMessage] = useState<string | null>(null);
 
-    if (data.classical_ref && data.classical_method && !data.purified_fraction) {
-      return {
-        category: "Classical Ayurvedic Medicine",
-        regulatory_reference: "Drugs & Cosmetics Act 1940 (Sec 3a)",
-        match_confidence: 96,
-        patentability_verdict: "Section 3(p) Absolute Bar",
-        verdict_badge: "PATENT BARRED",
-        verdict_color: "rose",
-        verdict_description: "Exact formulation documented in 1st Schedule authoritative texts. Direct Section 3(p) exclusion; prioritize Defensive Shield publishing.",
-        steps: [
-          { title: "State Licensing Authority (SLA) Approval", desc: "Apply under Rule 153 for classical Shastriya formulation", status: "REQUIRED", color: "rose" },
-          { title: "TKDL Defensive Vault Anchoring", desc: "Generate SHA-256 hash to preempt biopiracy by foreign MNCs", status: "RECOMMENDED", color: "amber" },
-          { title: "Pharmacopoeial Standards Testing", desc: "Meet Ayurvedic Pharmacopoeia of India (API) specifications", status: "REQUIRED", color: "rose" },
-          { title: "State Biodiversity Board (Form I)", desc: "File prior intimation for raw herbal ingredient sourcing", status: "MANDATORY", color: "rose" },
-        ],
-      };
-    }
-
-    return {
-      category: "Proprietary Ayurvedic Medicine",
-      regulatory_reference: "Rule 154 - Drugs & Cosmetics Rules",
-      match_confidence: 79,
-      patentability_verdict: "Conditional (Section 3e Scrutiny)",
-      verdict_badge: "EVIDENCE REQUIRED",
-      verdict_color: "amber",
-      verdict_description: "Polyherbal combination requires Combination Index (CI < 1) assay to refute Section 3(e) mere admixture rejection.",
-      steps: [
-        { title: "State AYUSH Manufacturing License", desc: "Form 25D submission to State Licensing Authority", status: "REQUIRED", color: "rose" },
-        { title: "Pilot Safety & Efficacy Documentation", desc: "Generate published literature evidence or observational clinical data", status: "REQUIRED", color: "rose" },
-        { title: "Synergy Bioassay Verification", desc: "Establish biological synergy to survive patent examiner scrutiny", status: "CRITICAL", color: "amber" },
-        { title: "SBB Access Clearance", desc: "Complete Form I filing before commercial marketing", status: "REQUIRED", color: "rose" },
-      ],
-    };
-  };
-
-  const [assessment, setAssessment] = useState(() => evaluateLocally(formData, jurisdiction));
-
-  // Sync state with shared store
+  // Check existing session
   useEffect(() => {
-    const active = getActiveFormulation();
-    if (active && active.name) {
-      const restoredData = {
-        search_query: active.name,
-        classical_ref: active.classicalRef ?? true,
-        classical_method: active.category?.includes("Classical"),
-        modern_excipients: active.modernCarrier ?? false,
-        purified_fraction: active.purifiedFraction ?? false,
-        ayurveda_aahar: active.category?.includes("Aahar"),
-        cosmetic_use: false,
-        synergistic_efficacy: active.synergyData ?? false,
-      };
-      setFormData(restoredData);
-      setJurisdiction(active.jurisdiction || "india");
-      setAssessment(evaluateLocally(restoredData, active.jurisdiction || "india"));
+    try {
+      const stored = localStorage.getItem("ipsakti_user");
+      const storedName = localStorage.getItem("userName");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.name) {
+          setCurrentUser(parsed);
+          setLoginName(parsed.name);
+          setLoginEmail(parsed.email || "demo@gmail.com");
+          return;
+        }
+      }
+      if (storedName) {
+        const fallbackUser = { name: storedName, email: "demo@gmail.com" };
+        setCurrentUser(fallbackUser);
+        setLoginName(storedName);
+      }
+    } catch {
+      // Ignore localStorage errors
     }
   }, []);
 
-  const [loading, setLoading] = useState(false);
-  const [selectedCitation, setSelectedCitation] = useState<"3p" | "3e" | "bda" | null>(null);
-
-  const selectedCount = useMemo(() => {
-    return criteriaList.filter((c) => formData[c.id]).length;
-  }, [formData]);
-
-  const completion = useMemo(() => {
-    return Math.round((selectedCount / criteriaList.length) * 100);
-  }, [selectedCount]);
-
-  const toggleCriterion = (id: string) => {
-    setFormData((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const handleJurisdictionChange = (jur: "india" | "international") => {
-    setJurisdiction(jur);
-    setAssessment(evaluateLocally(formData, jur));
-  };
-
-  const runEvaluation = async (dataToEvaluate = formData, jur = jurisdiction) => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/rag-classify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          formulation: dataToEvaluate.search_query,
-          jurisdiction: jur,
-          criteria: dataToEvaluate,
-        }),
-      });
-
-      const ragData = await res.json();
-      if (ragData?.success && ragData?.assessment) {
-        const localTemplate = evaluateLocally(dataToEvaluate, jur);
-        const updatedAssessment = {
-          ...localTemplate,
-          category: ragData.assessment.category,
-          patentability_verdict: ragData.assessment.patentability,
-          match_confidence: ragData.assessment.confidence,
-        };
-        setAssessment(updatedAssessment);
-
-        saveActiveFormulation({
-          name: dataToEvaluate.search_query,
-          category: ragData.assessment.category,
-          jurisdiction: jur,
-          purifiedFraction: Boolean(dataToEvaluate.purified_fraction),
-          synergyData: Boolean(dataToEvaluate.synergistic_efficacy),
-          modernCarrier: Boolean(dataToEvaluate.modern_excipients),
-          classicalRef: Boolean(dataToEvaluate.classical_ref),
-          patentabilityScore: ragData.assessment.confidence,
-        });
-
-        setLoading(false);
-        return;
-      }
-    } catch {
-      // Fallback
+  // Handle Login & Session Storage
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginName.trim()) {
+      setLoginError("Please enter your name.");
+      return;
+    }
+    if (!loginEmail.trim() || !loginEmail.includes("@")) {
+      setLoginError("Please enter a valid Gmail / Email address.");
+      return;
     }
 
-    const fallback = evaluateLocally(dataToEvaluate, jur);
-    setAssessment(fallback);
-    saveActiveFormulation({
-      name: dataToEvaluate.search_query,
-      category: fallback.category,
-      jurisdiction: jur,
-      purifiedFraction: Boolean(dataToEvaluate.purified_fraction),
-      synergyData: Boolean(dataToEvaluate.synergistic_efficacy),
-      modernCarrier: Boolean(dataToEvaluate.modern_excipients),
-      classicalRef: Boolean(dataToEvaluate.classical_ref),
-      patentabilityScore: fallback.match_confidence,
-    });
-    setLoading(false);
+    const userData = {
+      name: loginName.trim(),
+      email: loginEmail.trim(),
+      loggedInAt: new Date().toISOString(),
+      role: "Patent Agent / Researcher",
+    };
+
+    try {
+      localStorage.setItem("ipsakti_user", JSON.stringify(userData));
+      localStorage.setItem("userName", loginName.trim());
+      localStorage.setItem("userEmail", loginEmail.trim());
+      setCurrentUser(userData);
+    } catch (err) {
+      console.warn("localStorage write failed", err);
+    }
+
+    setIsLoginModalOpen(false);
+    router.push("/evaluator");
+  };
+
+  // Handle Logout & Session Cleanup
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("userName");
+      localStorage.removeItem("ipsakti_user");
+      localStorage.removeItem("userEmail");
+    } catch (err) {
+      console.warn("Session cleanup error", err);
+    }
+    setCurrentUser(null);
+  };
+
+  // Primary CTA click: if logged in, go straight to evaluator; otherwise open login modal
+  const handleLaunchEvaluator = () => {
+    if (currentUser) {
+      router.push("/evaluator");
+    } else {
+      setIsLoginModalOpen(true);
+    }
+  };
+
+  // Handle PDF Download
+  const handleDownloadPdf = async (lang: LanguageOption) => {
+    setDownloadingCode(lang.code);
+    setDownloadSuccessMessage(null);
+
+    const pdfUrl = `/docs/${lang.fileName}`;
+
+    try {
+      // Test if file exists via head request
+      const res = await fetch(pdfUrl, { method: "HEAD" });
+      if (!res.ok) {
+        throw new Error(`PDF asset pending upload (Status: ${res.status})`);
+      }
+
+      // Trigger direct download
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = lang.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setDownloadSuccessMessage(`Successfully downloading IP Framework Guide (${lang.name})!`);
+      setTimeout(() => {
+        setDownloadingCode(null);
+      }, 1200);
+    } catch (error) {
+      console.warn("Direct download fallback triggered:", error);
+      // Fallback: alert/toast and provide direct link
+      setDownloadSuccessMessage(
+        `Initiating download for ${lang.name} edition. If blocked by browser, check your downloads folder.`
+      );
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = lang.fileName;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => {
+        setDownloadingCode(null);
+      }, 1500);
+    }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-in fade-in duration-300">
-      {/* Workspace Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-mono tracking-widest text-emerald-400 uppercase mb-1">
-            <span className="w-2 h-0.5 bg-emerald-400" />
-            {t.workspace || "कार्यक्षेत्र / विधिक मूल्यांकन"}
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            {t.title || "आयुर्वेदिक नियामक एवं पेटेंट मूल्यांकनकर्ता"}
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            {t.subtitle || "अपनी निर्माण विधि (फॉर्मूलेशन) को विधिक संहिताओं, धारा 3(p) पारंपरिक ज्ञान अपवादों एवं अनिवार्य पंजीकरणों के आधार पर वर्गीकृत करें।"}
-          </p>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Bhashini Multilingual Dropdown */}
-          <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-            <Globe size={14} className="text-emerald-400 shrink-0" />
-            <select
-              value={lang}
-              onChange={(e) => changeLanguage(e.target.value as any)}
-              className="bg-slate-950 text-xs font-medium text-slate-200 focus:outline-none cursor-pointer pr-1"
-            >
-              {supportedLanguages.map((item) => (
-                <option key={item.code} value={item.code} className="bg-slate-900 text-slate-100">
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Jurisdiction Toggle */}
-          <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
-            <button
-              type="button"
-              onClick={() => handleJurisdictionChange("india")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                jurisdiction === "india"
-                  ? "bg-emerald-500 text-slate-950 shadow-md font-semibold"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Landmark size={14} />
-              <span>{t.national || "राष्ट्रीय (भारत / IPO)"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleJurisdictionChange("international")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                jurisdiction === "international"
-                  ? "bg-blue-500 text-white shadow-md font-semibold"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Globe2 size={14} />
-              <span>{t.international || "अंतर्राष्ट्रीय (WIPO / PCT)"}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Workspace Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Step 01: Formulation Profile */}
-        <section className="lg:col-span-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-sm space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-800/60 pb-4">
+    <div className="min-h-screen bg-[#070d18] text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-slate-950">
+      {/* ========================================================================= */}
+      {/* 1. CLEAN LANDING NAVIGATION BAR */}
+      {/* ========================================================================= */}
+      <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-[#070d18]/85 backdrop-blur-xl transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+          {/* Left: Brand Logo & Legaltech Badge */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/40 group-hover:border-emerald-500/50 transition">
+              <Scale className="w-5 h-5 text-emerald-400" />
+            </div>
             <div>
-              <span className="text-[10px] font-mono tracking-wider text-slate-500 uppercase block">STEP 01 / INPUT</span>
-              <h2 className="text-sm font-semibold text-slate-200">
-                {t.step1_title || "फॉर्मूलेशन रूपरेखा (इनपुट)"}
-              </h2>
-            </div>
-            <div className="text-right">
-              <span className="text-xs font-mono text-emerald-400">{completion}% {t.complete || "complete"}</span>
-              <div className="w-24 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                  style={{ width: `${completion}%` }}
-                />
+              <div className="flex items-center gap-2">
+                <span className="text-base sm:text-lg font-bold tracking-tight text-white group-hover:text-emerald-300 transition">
+                  IP-SAKTI Sahayak
+                </span>
+                <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 tracking-wider">
+                  Legaltech AI
+                </span>
               </div>
+              <p className="text-[11px] text-slate-400 hidden sm:block">
+                AYUSH Statutory Patentability & Biopiracy Defense Portal
+              </p>
             </div>
-          </div>
+          </Link>
 
-          {/* Presets */}
-          <div className="space-y-1.5 pb-2 border-b border-slate-800/60">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block mb-2">
-              {t.demo_scenarios || "परीक्षण परिदृश्य (1-क्लिक डेमो)"}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {DEMO_PRESETS.map((preset) => (
+          {/* Right Controls */}
+          <div className="flex items-center gap-3 sm:gap-3.5">
+            {/* Download IP Framework Guide Button */}
+            <button
+              type="button"
+              onClick={() => setIsDownloadModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-700 hover:border-emerald-500/40 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition active:scale-95 cursor-pointer shrink-0"
+            >
+              <Download size={14} className="text-emerald-400 shrink-0" />
+              <span className="hidden sm:inline">Download IP Framework Guide</span>
+              <span className="sm:hidden">IP Guide</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                PDF
+              </span>
+            </button>
+
+            {/* Portal Login / Access Button & Logout */}
+            {currentUser ? (
+              <div className="flex items-center gap-2">
                 <button
-                  key={preset.name}
                   type="button"
-                  onClick={() => {
-                    setFormData(preset.data);
-                    runEvaluation(preset.data, jurisdiction);
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 text-xs flex items-center gap-2 transition cursor-pointer group"
+                  onClick={() => router.push("/evaluator")}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition active:scale-95 cursor-pointer"
                 >
-                  <span className="text-slate-300 group-hover:text-white font-medium text-[11px]">
-                    {preset.name}
-                  </span>
-                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${preset.badgeColor}`}>
-                    {preset.badge}
-                  </span>
+                  <User size={14} />
+                  <span className="max-w-[110px] truncate">{currentUser.name}</span>
+                  <span className="text-[10px] font-medium opacity-85">(Workspace)</span>
+                  <ArrowRight size={13} />
                 </button>
-              ))}
-            </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Logout from session"
+                >
+                  <LogOut size={13} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsLoginModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition active:scale-95 cursor-pointer"
+              >
+                <LogIn size={14} />
+                <span>Portal Login / Access</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* ========================================================================= */}
+      {/* 2. HERO SECTION */}
+      {/* ========================================================================= */}
+      <section className="relative overflow-hidden pt-12 pb-20 sm:pt-20 sm:pb-28 border-b border-slate-900">
+        {/* Background glow effects */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 max-w-4xl h-96 bg-emerald-500/10 blur-[130px] rounded-full pointer-events-none" />
+        <div className="absolute top-1/3 right-10 w-64 h-64 bg-teal-500/5 blur-[100px] rounded-full pointer-events-none" />
+
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 space-y-8">
+          {/* Top Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 shadow-inner">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-xs font-semibold text-slate-300">
+              National AYUSH Patent Intelligence & Statutory Assessment Engine
+            </span>
           </div>
 
-          {/* Keywords */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-slate-300">
-                {t.keywords_label || "वानस्पतिक घटक / द्रव्य"}
-              </label>
-              <VoiceInputButton
-                onTranscript={(text) =>
-                  setFormData((prev) => ({ ...prev, search_query: text }))
-                }
-              />
-            </div>
-            <div className="relative">
-              <input
-                id="keywords"
-                type="text"
-                value={formData.search_query}
-                onChange={(e) => setFormData((prev) => ({ ...prev, search_query: e.target.value }))}
-                placeholder="e.g. Ashwagandha, Brahmi, Shatavari..."
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 transition"
-              />
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-0.5">
-              <Waves size={12} className="text-slate-400" />
-              <span>{t.keywords_hint || "वानस्पतिक मिलान हेतु अल्पविराम (कॉमा) का उपयोग करें"}</span>
-            </div>
+          {/* Bold Display Title */}
+          <div className="space-y-4 max-w-4xl mx-auto">
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1]">
+              IP-SAKTI{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+                SAHAYAK
+              </span>
+            </h1>
+            <p className="text-lg sm:text-2xl font-medium text-slate-300 max-w-3xl mx-auto leading-relaxed">
+              AI-driven statutory patentability, TKDL compliance, and sovereign biopiracy defense under the Indian
+              Patents Act 1970 & BDA 2024.
+            </p>
           </div>
 
-          {/* Criteria Checklist */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="font-medium">{t.statutory_criteria || "वैधानिक मूल्यांकन मानदंड"}</span>
-              <span className="font-mono text-[11px]">{selectedCount} / {criteriaList.length} {t.selected || "selected"}</span>
-            </div>
+          <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mx-auto">
+            Empowering patent agents, Ayurvedic researchers, and pharmaceutical innovators to rigorously evaluate Section
+            3(p) Traditional Knowledge exclusions, Section 3(e) synergistic thresholds, and BDA Access & Benefit
+            Sharing (ABS).
+          </p>
 
-            <div className="space-y-2">
-              {criteriaList.map(({ id, title, desc }) => {
-                const checked = Boolean(formData[id]);
-                return (
-                  <label
-                    key={id}
-                    className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${
-                      checked
-                        ? "bg-slate-950/60 border-emerald-500/40 shadow-sm shadow-emerald-950/20"
-                        : "bg-slate-950/20 border-slate-800/80 hover:border-slate-700"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleCriterion(id)}
-                      className="mt-0.5 rounded border-slate-700 text-emerald-500 focus:ring-0"
-                    />
-                    <div className="space-y-0.5">
-                      <span className={`text-xs font-semibold block ${checked ? "text-slate-100" : "text-slate-300"}`}>
-                        {title}
+          {/* Primary CTA & Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+            <button
+              type="button"
+              onClick={handleLaunchEvaluator}
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-base flex items-center justify-center gap-3 shadow-xl shadow-emerald-950/60 hover:shadow-emerald-900/80 transition transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+            >
+              <Scale className="w-5 h-5" />
+              <span>Launch Statutory Evaluator</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsDownloadModalOpen(true)}
+              className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700 hover:border-slate-600 text-slate-200 font-semibold text-sm flex items-center justify-center gap-2.5 transition cursor-pointer"
+            >
+              <Download size={16} className="text-emerald-400" />
+              <span>Download IP Framework Guide</span>
+            </button>
+          </div>
+
+          {/* Quick Metrics / Statutory Highlights */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto pt-8">
+            <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-left">
+              <div className="text-xl font-bold text-white">34+ Offices</div>
+              <div className="text-[11px] text-slate-400">TKDL International Prior Art</div>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-left">
+              <div className="text-xl font-bold text-emerald-400">Section 3(p)</div>
+              <div className="text-[11px] text-slate-400">TK & Aggregation Defense</div>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-left">
+              <div className="text-xl font-bold text-teal-400">Section 3(e)</div>
+              <div className="text-[11px] text-slate-400">Synergy Verification CI &lt; 1</div>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-left">
+              <div className="text-xl font-bold text-cyan-400">BDA 2024</div>
+              <div className="text-[11px] text-slate-400">ABS & SBB Compliance Tracks</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 3. KEY PATENT SECTIONS & STATUTORY LAWS GRID */}
+      {/* ========================================================================= */}
+      <section className="py-16 sm:py-24 border-b border-slate-900 bg-slate-950/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+              <Scale size={13} />
+              <span>Statutory Legal Framework</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
+              Essential Patent Statutes & Regulatory Directives
+            </h2>
+            <p className="text-sm sm:text-base text-slate-400">
+              The cornerstone legislative provisions governing Ayurvedic, botanical, and natural product patent
+              applications before the Indian Patent Office (IPO) and global registries.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {STATUTORY_SECTIONS.map((item, idx) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={idx}
+                  className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 relative overflow-hidden transition group flex flex-col justify-between"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-md border ${item.badgeColor}`}>
+                        {item.tag}
                       </span>
-                      <span className="text-[11px] text-slate-500 leading-normal block">
-                        {desc}
+                      <span className="text-xs text-slate-500 font-medium">{item.act}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-bold text-white group-hover:text-emerald-300 transition flex items-center gap-2">
+                        <Icon className="w-5 h-5 text-emerald-400 shrink-0" />
+                        <span>{item.title}</span>
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">{item.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-start gap-2 text-xs text-emerald-400/90 font-medium bg-emerald-950/20 p-2.5 rounded-xl border border-emerald-500/10">
+                    <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{item.highlight}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 4. PLATFORM FEATURES OVERVIEW */}
+      {/* ========================================================================= */}
+      <section className="py-16 sm:py-24 border-b border-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="space-y-3 max-w-2xl">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-semibold uppercase tracking-wider">
+                <Layers size={13} />
+                <span>Integrated Workspace Suites</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Full-Spectrum AYUSH IPR Toolkit</h2>
+              <p className="text-sm text-slate-400">
+                Seamlessly progress from raw botanical formulation intake to international filing roadmaps, ABS
+                verification, and simulated controller cross-examination.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLaunchEvaluator}
+              className="px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-emerald-500/40 text-xs font-semibold text-emerald-400 flex items-center gap-2 self-start md:self-auto transition cursor-pointer"
+            >
+              <span>Enter Main Workspace</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {PLATFORM_FEATURES.map((feat, idx) => {
+              const Icon = feat.icon;
+              return (
+                <div
+                  key={idx}
+                  className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/30 transition group flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition">
+                        <Icon size={18} />
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        {feat.tag}
                       </span>
                     </div>
-                  </label>
+
+                    <div>
+                      <h3 className="text-base font-bold text-white group-hover:text-emerald-300 transition">
+                        {feat.title}
+                      </h3>
+                      <p className="text-[11px] text-emerald-400/80 font-medium mb-1.5">{feat.subtitle}</p>
+                      <p className="text-xs text-slate-400 leading-relaxed">{feat.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                    <Link
+                      href={feat.href}
+                      className="text-xs font-semibold text-slate-300 hover:text-emerald-400 flex items-center gap-1.5 transition"
+                    >
+                      <span>Open Module</span>
+                      <ChevronRight size={13} className="text-slate-500 group-hover:text-emerald-400 transition" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 5. OFFICIAL GOVERNMENT AUTHORITIES / REGISTRIES BAR */}
+      {/* ========================================================================= */}
+      <section className="py-14 sm:py-20 bg-slate-950/80 border-b border-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+              <GraduationCap size={13} className="text-emerald-400" />
+              <span>Official Registry Verification</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Government Registries & Statutory Portals</h2>
+            <p className="text-xs sm:text-sm text-slate-400">
+              Direct verification portals for gazette notifications, patent prosecution documents, and biodiversity
+              mandates.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {GOV_AUTHORITIES.map((auth, idx) => (
+              <a
+                key={idx}
+                href={auth.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition flex flex-col justify-between group"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      {auth.badge}
+                    </span>
+                    <ExternalLink size={13} className="text-slate-500 group-hover:text-emerald-400 transition" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white group-hover:text-emerald-300 transition">
+                      {auth.name}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 line-clamp-1">{auth.fullname}</p>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{auth.description}</p>
+                </div>
+                <div className="mt-3 pt-2 text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                  <span>Visit: {auth.url.replace(/^https?:\/\//, "")}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* FOOTER */}
+      {/* ========================================================================= */}
+      <footer className="py-8 bg-[#070d18] border-t border-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-white">IP-SAKTI SAHAYAK</span>
+            <span>·</span>
+            <span>AYUSH LegalTech & Patent Intelligence Portal</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsDownloadModalOpen(true)}
+              className="hover:text-emerald-400 transition flex items-center gap-1 cursor-pointer"
+            >
+              <Download size={12} />
+              <span>Download Guide</span>
+            </button>
+            <span>·</span>
+            <Link href="/evaluator" className="hover:text-emerald-400 transition">
+              Workspace
+            </Link>
+            <span>·</span>
+            <span className="text-slate-400">Patents Act 1970 & BDA 2024</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* ========================================================================= */}
+      {/* 2. LANGUAGE DOWNLOAD MODAL */}
+      {/* ========================================================================= */}
+      {isDownloadModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsDownloadModalOpen(false);
+          }}
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 sm:p-7 space-y-6 relative">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsDownloadModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Modal Header */}
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                <FileText size={14} />
+                <span>Statutory Reference Documentation</span>
+              </div>
+              <h3 className="text-xl font-bold text-white">In which language do you want to download this PDF?</h3>
+              <p className="text-xs text-slate-400">
+                Download the official IP-SAKTI statutory framework guide covering Section 3(p), Section 3(e), BDA 2024,
+                and GSR 918(E) in your preferred official language.
+              </p>
+            </div>
+
+            {/* Download Status Toast / Feedback */}
+            {downloadSuccessMessage && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                <span>{downloadSuccessMessage}</span>
+              </div>
+            )}
+
+            {/* Language Options Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {LANGUAGE_OPTIONS.map((lang) => {
+                const isDownloading = downloadingCode === lang.code;
+                return (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={() => handleDownloadPdf(lang)}
+                    disabled={isDownloading}
+                    className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-emerald-500/40 hover:bg-slate-950 text-left transition group flex flex-col justify-between disabled:opacity-50 cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-base font-bold text-white group-hover:text-emerald-300 transition">
+                          {lang.nativeName}
+                        </div>
+                        <div className="text-xs text-slate-400">{lang.name}</div>
+                      </div>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        {lang.fileSize}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 group-hover:text-emerald-400 transition">
+                      <span className="text-[10px] text-slate-500">{lang.badge}</span>
+                      <div className="flex items-center gap-1 font-semibold">
+                        {isDownloading ? (
+                          <span className="animate-pulse text-emerald-400">Downloading...</span>
+                        ) : (
+                          <>
+                            <span>Download PDF</span>
+                            <Download size={12} />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </button>
                 );
               })}
             </div>
-          </div>
 
-          {/* Run Assessment Button */}
-          <button
-            onClick={() => runEvaluation(formData, jurisdiction)}
-            disabled={loading}
-            className={`w-full py-3 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg disabled:opacity-50 ${
-              jurisdiction === "india"
-                ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/40"
-                : "bg-blue-500 hover:bg-blue-400 text-white shadow-blue-950/40"
-            }`}
-          >
-            <Sparkles size={15} />
-            <span>
-              {loading
-                ? (t.evaluating || "मूल्यांकन जारी है...")
-                : (jurisdiction === "india"
-                    ? (t.evaluate_btn_nat || "वैधानिक मूल्यांकन प्रारंभ करें")
-                    : (t.evaluate_btn_int || "अंतर्राष्ट्रीय पेटेंट योग्यता जांचें"))}
-            </span>
-            <ArrowUpRight size={14} />
-          </button>
-        </section>
-
-        {/* Step 02: Findings Panel */}
-        <section className="lg:col-span-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-sm space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-800/60 pb-4">
-            <div>
-              <span className="text-[10px] font-mono tracking-wider text-slate-500 uppercase block">STEP 02 / FINDINGS</span>
-              <h2 className="text-sm font-semibold text-slate-200">
-                {jurisdiction === "india" ? (t.step2_title_nat || "राष्ट्रीय विधिक मूल्यांकन परिणाम") : (t.step2_title_int || "अंतर्राष्ट्रीय अनुपालन परिणाम")}
-              </h2>
-            </div>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700/60 text-slate-400">
-              {jurisdiction === "india" ? "JUR: IN-IPO" : "JUR: INT-WIPO"}
-            </span>
-          </div>
-
-          {/* Category Banner */}
-          <div className={`p-4 rounded-xl border flex items-center justify-between gap-4 ${
-            jurisdiction === "india" ? "border-emerald-500/20 bg-emerald-500/5" : "border-blue-500/20 bg-blue-500/5"
-          }`}>
-            <div className="flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                jurisdiction === "india"
-                  ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
-                  : "bg-blue-500/10 border border-blue-500/30 text-blue-400"
-              }`}>
-                {jurisdiction === "india" ? <Leaf size={18} /> : <Globe size={18} />}
-              </div>
-              <div className="space-y-1">
-                <span className="text-[10px] font-mono text-slate-400 block tracking-wider uppercase">
-                  {t.rec_class || "अनुशंसित विधिक वर्गीकरण"}
-                </span>
-                <h3 className="text-base font-bold text-white leading-tight">
-                  {assessment.category?.includes("Classical")
-                    ? (t.cat_classical || assessment.category)
-                    : assessment.category?.includes("Aahar")
-                    ? (t.cat_functional || assessment.category)
-                    : assessment.category?.includes("Phyto")
-                    ? (t.cat_phyto || assessment.category)
-                    : assessment.category}
-                </h3>
-                <div className="flex items-center gap-2 pt-0.5">
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 border border-slate-700/60">
-                    {jurisdiction === "india" ? "CDSCO / AYUSH" : "WIPO / GRATK 2024"}
-                  </span>
-                  <span className={`text-[10px] font-medium ${jurisdiction === "india" ? "text-emerald-400" : "text-blue-400"}`}>
-                    {assessment.regulatory_reference}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="text-right shrink-0">
-              <span className={`text-lg font-bold block font-mono ${jurisdiction === "india" ? "text-emerald-400" : "text-blue-400"}`}>
-                {assessment.match_confidence}%
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono block">
-                {t.match_confidence || "सटीकता स्कोर"}
-              </span>
+            <div className="pt-2 text-center text-[11px] text-slate-400">
+              Files are stored in <code className="text-slate-300 font-mono">/public/docs/</code> and free for public statutory dissemination.
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Patentability Verdict Box */}
-          <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono text-slate-400 block tracking-wider uppercase">
-                {t.patent_verdict || "पेटेंट पात्रता एवं निर्णय"}
-              </span>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    assessment.verdict_color === "rose"
-                      ? "bg-rose-400"
-                      : assessment.verdict_color === "blue"
-                      ? "bg-blue-400"
-                      : "bg-emerald-400 animate-pulse"
-                  }`}
-                />
-                <h4 className="text-sm font-bold text-white">
-                  {(assessment as any).patentability_verdict?.includes("3(p)") || (assessment as any).patentability_verdict?.includes("Barred")
-                    ? (t.verdict_3p || (assessment as any).patentability_verdict)
-                    : (assessment as any).patentability_verdict}
-                </h4>
+      {/* ========================================================================= */}
+      {/* 3. LOGIN MODAL & WORKSPACE ACCESS */}
+      {/* ========================================================================= */}
+      {isLoginModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsLoginModalOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 sm:p-7 space-y-6 relative">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsLoginModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Modal Header */}
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <Lock size={20} />
               </div>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                {(assessment as any).patentability_verdict?.includes("3(p)") && t.verdict_3p_desc
-                  ? t.verdict_3p_desc
-                  : assessment.verdict_description}
+              <h3 className="text-xl font-bold text-white">Portal Login / Workspace Access</h3>
+              <p className="text-xs text-slate-400">
+                Enter your credentials to enter the IP-SAKTI AYUSH statutory evaluation workspace.
               </p>
             </div>
-            <span
-              className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium flex items-center gap-1.5 border ${
-                assessment.verdict_color === "rose"
-                  ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                  : assessment.verdict_color === "blue"
-                  ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-              }`}
-            >
-              <BadgeCheck size={13} />
-              <span>{assessment.verdict_badge}</span>
-            </span>
-          </div>
 
-          {/* Compliance Checklist */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-300">
-                {t.statutory_checklist || "अनिवार्य विधिक अनुपालन सूची"}
-              </span>
-              <span className="text-slate-500 font-mono text-[11px]">
-                {assessment.steps.length} {t.requirements || "अनिवार्य शर्तें"}
-              </span>
-            </div>
-            <ul className="space-y-2">
-              {assessment.steps.map((step, idx) => (
-                <li key={idx} className="flex items-start gap-3 p-2.5 rounded-lg border border-slate-800/80 bg-slate-950/40">
-                  <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                    jurisdiction === "india" ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"
-                  }`}>
-                    <Check size={11} strokeWidth={3} />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <strong className="text-xs text-slate-200 block">{step.title}</strong>
-                    <span className="text-[11px] text-slate-500 block">{step.desc}</span>
-                  </div>
-                  <span
-                    className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border shrink-0 ${
-                      step.color === "rose"
-                        ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                        : step.color === "amber"
-                        ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                    }`}
-                  >
-                    {step.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+            {/* Error message */}
+            {loginError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
 
-          {/* Citations Split View triggers */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-300">{t.statutory_sources || "Statutory & Treaty sources"}</span>
-              <span className="text-slate-500 flex items-center gap-1 text-[11px]">
-                <span>{t.inspect_authority || "Inspect authority"}</span>
-                <ArrowUpRight size={12} />
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {/* Form */}
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <User size={13} className="text-emerald-400" />
+                  <span>Your Name</span>
+                </label>
+                <input
+                  type="text"
+                  value={loginName}
+                  onChange={(e) => {
+                    setLoginName(e.target.value);
+                    setLoginError("");
+                  }}
+                  placeholder="Vivek"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm text-slate-100 placeholder-slate-500 outline-none transition"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Mail size={13} className="text-emerald-400" />
+                  <span>Gmail / Email Address</span>
+                </label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => {
+                    setLoginEmail(e.target.value);
+                    setLoginError("");
+                  }}
+                  placeholder="demo@gmail.com"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm text-slate-100 placeholder-slate-500 outline-none transition"
+                />
+              </div>
+
               <button
-                type="button"
-                onClick={() => setSelectedCitation("3p")}
-                className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-500/50 hover:bg-amber-500/5 text-slate-300 text-xs flex items-center justify-between transition cursor-pointer group"
+                type="submit"
+                className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 transition active:scale-95 cursor-pointer"
               >
-                <div className="flex items-center gap-2">
-                  <BookOpenCheck size={13} className="text-amber-400" />
-                  <span className="text-[11px]">{jurisdiction === "india" ? "Sec. 3(p) TK" : "WIPO GRATK"}</span>
-                </div>
-                <ArrowUpRight size={12} className="text-slate-500 group-hover:text-amber-400" />
+                <LogIn size={16} />
+                <span>Sign In & Enter Workspace</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCitation("3e")}
-                className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-blue-500/50 hover:bg-blue-500/5 text-slate-300 text-xs flex items-center justify-between transition cursor-pointer group"
-              >
-                <div className="flex items-center gap-2">
-                  <Scale size={13} className="text-blue-400" />
-                  <span className="text-[11px]">{jurisdiction === "india" ? "Sec. 3(e) Admix" : "PCT Rule 34"}</span>
-                </div>
-                <ArrowUpRight size={12} className="text-slate-500 group-hover:text-blue-400" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCitation("bda")}
-                className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-slate-300 text-xs flex items-center justify-between transition cursor-pointer group"
-              >
-                <div className="flex items-center gap-2">
-                  <Leaf size={13} className="text-emerald-400" />
-                  <span className="text-[11px]">{jurisdiction === "india" ? "BDA 2024 SBB" : "Nagoya ABS"}</span>
-                </div>
-                <ArrowUpRight size={12} className="text-slate-500 group-hover:text-emerald-400" />
-              </button>
+            </form>
+
+            <div className="pt-1 text-center text-[11px] text-slate-400">
+              Session is saved locally in your browser to maintain your active patent dossiers and drafts.
             </div>
           </div>
-
-          {/* Authoritative Corpus Links */}
-          <div className="pt-2 border-t border-slate-800/60">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
-                {t.authoritative_corpus || "Authoritative Legal Corpus (Verified Public Registries)"}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <a
-                href="https://www.tkdl.res.in"
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-emerald-500/40 text-[11px] text-slate-300 flex items-center justify-between transition group"
-              >
-                <span className="truncate">CSIR-TKDL</span>
-                <ArrowUpRight size={11} className="text-slate-500 group-hover:text-emerald-400" />
-              </a>
-              <a
-                href="https://www.indiacode.nic.in"
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-blue-500/40 text-[11px] text-slate-300 flex items-center justify-between transition group"
-              >
-                <span className="truncate">India Code</span>
-                <ArrowUpRight size={11} className="text-slate-500 group-hover:text-blue-400" />
-              </a>
-              <a
-                href="https://ipindia.gov.in"
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-amber-500/40 text-[11px] text-slate-300 flex items-center justify-between transition group"
-              >
-                <span className="truncate">IP India</span>
-                <ArrowUpRight size={11} className="text-slate-500 group-hover:text-amber-400" />
-              </a>
-              <a
-                href="https://nbaindia.org"
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-lg bg-slate-950 border border-slate-800 hover:border-emerald-500/40 text-[11px] text-slate-300 flex items-center justify-between transition group"
-              >
-                <span className="truncate">NBA India</span>
-                <ArrowUpRight size={11} className="text-slate-500 group-hover:text-emerald-400" />
-              </a>
-            </div>
-          </div>
-
-          {/* Dossier Download Action */}
-          <DossierExportButton
-            data={{
-              formulation: formData.search_query || "Ayurvedic Herbal Compound",
-              category: assessment.category,
-              patentRoute: assessment.patentability_verdict,
-              patentability: assessment.patentability_verdict,
-              noveltyScore: assessment.match_confidence,
-              statutoryBars: [
-                jurisdiction === "india" ? "Section 3(p) Traditional Knowledge review" : "WIPO GRATK Origin Disclosure obligation",
-                jurisdiction === "india" ? "Section 3(e) Synergy index data required" : "PCT Rule 34 Prior-Art Search against TKDL",
-              ],
-              mandatorySteps: assessment.steps.map((s) => `${s.title} (${s.status})`),
-            }}
-          />
-        </section>
-      </div>
-
-      {/* Footer Disclaimer */}
-      <footer className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 pt-8 border-t border-slate-800/80">
-        <span className="flex items-center gap-1.5">
-          <ShieldCheck size={14} className="text-emerald-500" />
-          {t.disclaimer || "Authoritative legal assistant: Provides statutory information, not formal legal advice."}
-        </span>
-        <span className="font-mono text-[11px]">Corpus: Patents Act 2024 / BDA 2024 / WIPO GRATK</span>
-      </footer>
-
-      {/* Inspection Modal */}
-      {selectedCitation && (
-        <PdfViewerModal
-          isOpen={!!selectedCitation}
-          onClose={() => setSelectedCitation(null)}
-          citationType={selectedCitation}
-        />
+        </div>
       )}
     </div>
   );
